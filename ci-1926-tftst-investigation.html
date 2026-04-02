@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CI-1926: Orphaned GCP Projects Investigation</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --surface: #16213e;
+    --surface2: #0f3460;
+    --accent: #e94560;
+    --accent2: #533483;
+    --text: #eee;
+    --text-muted: #aab;
+    --green: #4ecca3;
+    --yellow: #f0c929;
+    --orange: #ff6b35;
+    --code-bg: #0d1117;
+    --border: #2a2a4a;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+    padding: 0;
+  }
+  .hero {
+    background: linear-gradient(135deg, var(--surface) 0%, var(--accent2) 100%);
+    padding: 3rem 2rem;
+    border-bottom: 3px solid var(--accent);
+  }
+  .hero h1 {
+    font-size: 2rem;
+    font-weight: 700;
+    margin-bottom: 0.5rem;
+  }
+  .hero .subtitle {
+    color: var(--text-muted);
+    font-size: 1rem;
+  }
+  .hero .meta {
+    margin-top: 1rem;
+    display: flex;
+    gap: 1.5rem;
+    flex-wrap: wrap;
+    font-size: 0.85rem;
+  }
+  .hero .meta span {
+    background: rgba(255,255,255,0.08);
+    padding: 0.3rem 0.8rem;
+    border-radius: 6px;
+  }
+  .hero .meta a {
+    color: var(--green);
+    text-decoration: none;
+  }
+  .hero .meta a:hover { text-decoration: underline; }
+  .cost-banner {
+    background: linear-gradient(90deg, rgba(233,69,96,0.15), rgba(233,69,96,0.05));
+    border-left: 4px solid var(--accent);
+    padding: 1rem 1.5rem;
+    margin: 2rem auto;
+    max-width: 900px;
+    border-radius: 0 8px 8px 0;
+    font-size: 1.2rem;
+    font-weight: 600;
+  }
+  .cost-banner .amount { color: var(--accent); font-size: 1.5rem; }
+  .container {
+    max-width: 900px;
+    margin: 0 auto;
+    padding: 0 2rem 4rem;
+  }
+  .toc {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.5rem;
+    margin: 2rem 0;
+  }
+  .toc h3 {
+    font-size: 0.85rem;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--text-muted);
+    margin-bottom: 0.75rem;
+  }
+  .toc ul { list-style: none; }
+  .toc li { margin: 0.4rem 0; }
+  .toc a {
+    color: var(--green);
+    text-decoration: none;
+    font-size: 0.95rem;
+  }
+  .toc a:hover { text-decoration: underline; }
+  h2 {
+    font-size: 1.5rem;
+    margin: 2.5rem 0 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 1px solid var(--border);
+  }
+  h3 {
+    font-size: 1.15rem;
+    margin: 1.5rem 0 0.75rem;
+    color: var(--green);
+  }
+  p { margin: 0.75rem 0; }
+  code {
+    background: var(--code-bg);
+    padding: 0.15rem 0.4rem;
+    border-radius: 4px;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: 0.88em;
+    color: var(--yellow);
+  }
+  pre {
+    background: var(--code-bg);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 1.25rem;
+    overflow-x: auto;
+    margin: 1rem 0;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: 0.85rem;
+    line-height: 1.6;
+  }
+  pre code {
+    background: none;
+    padding: 0;
+    color: var(--text);
+  }
+  .step-flow {
+    display: flex;
+    flex-direction: column;
+    gap: 0;
+    margin: 1.5rem 0;
+  }
+  .step {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.6rem 0;
+  }
+  .step-num {
+    background: var(--surface2);
+    color: var(--text-muted);
+    width: 2rem;
+    height: 2rem;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 0.8rem;
+    font-weight: 700;
+    flex-shrink: 0;
+  }
+  .step-line {
+    color: var(--text-muted);
+    font-size: 0.85rem;
+  }
+  .step-line .label { color: var(--yellow); font-family: monospace; }
+  .step-arrow {
+    margin-left: 0.85rem;
+    color: var(--text-muted);
+    font-size: 1.2rem;
+  }
+  .tag {
+    display: inline-block;
+    padding: 0.2rem 0.6rem;
+    border-radius: 4px;
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    margin-left: 0.5rem;
+    vertical-align: middle;
+  }
+  .tag-critical { background: var(--accent); color: #fff; }
+  .tag-cleanup { background: var(--orange); color: #fff; }
+  .tag-prevention { background: var(--green); color: #1a1a2e; }
+  .tag-done { background: var(--green); color: #1a1a2e; }
+  .callout {
+    background: rgba(78, 204, 163, 0.08);
+    border-left: 4px solid var(--green);
+    padding: 1rem 1.5rem;
+    border-radius: 0 8px 8px 0;
+    margin: 1rem 0;
+  }
+  .callout-warn {
+    background: rgba(240, 201, 41, 0.08);
+    border-left: 4px solid var(--yellow);
+  }
+  ul, ol { margin: 0.75rem 0 0.75rem 1.5rem; }
+  li { margin: 0.4rem 0; }
+  a { color: var(--green); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 1rem 0;
+    font-size: 0.9rem;
+  }
+  th {
+    background: var(--surface2);
+    text-align: left;
+    padding: 0.75rem 1rem;
+    font-weight: 600;
+    border-bottom: 2px solid var(--border);
+  }
+  td {
+    padding: 0.6rem 1rem;
+    border-bottom: 1px solid var(--border);
+  }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+  .timeline {
+    border-left: 2px solid var(--accent2);
+    margin: 1.5rem 0 1.5rem 1rem;
+    padding-left: 1.5rem;
+  }
+  .timeline-entry {
+    position: relative;
+    margin-bottom: 1.25rem;
+  }
+  .timeline-entry::before {
+    content: '';
+    position: absolute;
+    left: -1.85rem;
+    top: 0.5rem;
+    width: 10px;
+    height: 10px;
+    border-radius: 50%;
+    background: var(--accent2);
+    border: 2px solid var(--bg);
+  }
+  .timeline-date {
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    font-family: monospace;
+  }
+  .timeline-text { font-size: 0.95rem; }
+  .timeline-author { color: var(--yellow); font-weight: 600; }
+  .footer {
+    margin-top: 3rem;
+    padding-top: 1.5rem;
+    border-top: 1px solid var(--border);
+    font-size: 0.8rem;
+    color: var(--text-muted);
+    text-align: center;
+  }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <h1>Orphaned <code>anyscale-tftst</code> GCP Projects</h1>
+  <p class="subtitle">CI-1926 Investigation &mdash; Root cause analysis and remediation</p>
+  <div class="meta">
+    <span>Jira: <a href="https://anyscale1.atlassian.net/browse/CI-1926">CI-1926</a> (P1, Closed)</span>
+    <span>Slack: <a href="https://anyscaleteam.slack.com/archives/C03H71KUPJN/p1774412474485259">#cloud-cost-audit thread</a></span>
+    <span>Assignee: Sumeet Khirwal</span>
+    <span>Reporter: Arun Singhal</span>
+  </div>
+</div>
+
+<div class="cost-banner">
+  <span class="amount">~$17k/month</span> &mdash; 393 orphaned GCP projects at ~$157/month each
+</div>
+
+<div class="container">
+
+  <nav class="toc">
+    <h3>On This Page</h3>
+    <ul>
+      <li><a href="#problem">The Problem</a></li>
+      <li><a href="#root-cause">Root Cause</a></li>
+      <li><a href="#no-safety-net">Why There Was No Safety Net</a></li>
+      <li><a href="#fix">Fix &amp; Remediation</a></li>
+      <li><a href="#timeline">Timeline</a></li>
+      <li><a href="#references">References</a></li>
+    </ul>
+  </nav>
+
+  <!-- ======== PROBLEM ======== -->
+  <h2 id="problem">The Problem</h2>
+  <p>
+    393 orphaned GCP projects prefixed <code>anyscale-tftst</code> were leaking from the
+    Terraform E2E test at <code>backend/tests/bk_e2e/test_cloud_terraform.py</code>.
+    Each project cost ~$157/month, totaling <strong>~$17k/month</strong> in wasted spend.
+  </p>
+  <p>
+    The leak has been ongoing since <strong>July 2023</strong> when the GCP test was first added
+    (commit <code>9cdc2ccd</code> by Yue Zhang).
+  </p>
+
+  <!-- ======== ROOT CAUSE ======== -->
+  <h2 id="root-cause">Root Cause</h2>
+  <p>
+    <code>test_terraform_anyscale_v2_e2e_public_gcp</code> (line 215) had no
+    <code>try/finally</code> block. The flow was sequential with no error recovery:
+  </p>
+
+  <div class="step-flow">
+    <div class="step">
+      <span class="step-num">1</span>
+      <span class="step-line"><span class="label">L248</span> &nbsp; <code>tf.apply()</code> &mdash; Creates GCP project (<code>anyscale-tftst-XXXX</code>)</span>
+    </div>
+    <div class="step-arrow">&darr;</div>
+    <div class="step">
+      <span class="step-num">2</span>
+      <span class="step-line"><span class="label">L262</span> &nbsp; Register cloud with Anyscale</span>
+    </div>
+    <div class="step-arrow">&darr;</div>
+    <div class="step">
+      <span class="step-num">3</span>
+      <span class="step-line"><span class="label">L311</span> &nbsp; Wait for admin zone readiness</span>
+    </div>
+    <div class="step-arrow">&darr;</div>
+    <div class="step">
+      <span class="step-num">4</span>
+      <span class="step-line"><span class="label">L317</span> &nbsp; Delete cloud</span>
+    </div>
+    <div class="step-arrow">&darr;</div>
+    <div class="step">
+      <span class="step-num">5</span>
+      <span class="step-line"><span class="label">L324</span> &nbsp; <code>tf.destroy()</code> &mdash; Removes the GCP project</span>
+    </div>
+  </div>
+
+  <p>
+    If any step between 1 and 5 failed &mdash; or the <strong>30-minute Buildkite timeout</strong>
+    (<code>.buildkite/pipeline.predeploy.yaml:335</code>) killed the process &mdash;
+    <code>tf.destroy()</code> never ran and the GCP project persisted forever at ~$157/month.
+  </p>
+  <p>
+    The same pattern existed in the AWS test (<code>test_terraform_anyscale_v2_e2e_public_aws</code>,
+    line 79), but AWS resources are cheaper and the blast radius is smaller since it doesn't create
+    entire cloud accounts.
+  </p>
+
+  <!-- ======== NO SAFETY NET ======== -->
+  <h2 id="no-safety-net">Why There Was No Safety Net</h2>
+  <ul>
+    <li>
+      <strong>CI cleanup cron doesn't cover GCP projects.</strong>
+      <code>tools/kubernetes/ci/cleanup.py</code> only cleans K8s namespaces and config maps.
+      No GCP project cleanup existed anywhere in the codebase.
+    </li>
+    <li>
+      <strong>The <code>anyscale-tftst</code> prefix comes from an external Terraform module</strong>
+      (<code>terraform-google-anyscale-cloudfoundation-modules</code>), not from code in this repo.
+      The test clones that module at runtime (line 219-221).
+    </li>
+    <li>
+      <strong>Leaking since July 2023</strong> when Yue Zhang added the GCP test (commit
+      <code>9cdc2ccd</code>). 32 orphaned project names were visible in the predeploy bootstrap
+      Terraform state alone.
+    </li>
+  </ul>
+
+  <!-- ======== FIX ======== -->
+  <h2 id="fix">Fix &amp; Remediation</h2>
+
+  <h3>1. Wrap tests in <code>try/finally</code> <span class="tag tag-critical">Critical</span> <span class="tag tag-done">Done</span></h3>
+  <p>
+    Ensures <code>tf.destroy()</code> runs even when the test fails mid-way (cloud registration
+    error, admin zone timeout, etc.). Shipped in
+    <a href="https://github.com/anyscale/product/pull/38915">PR #38915</a>.
+  </p>
+  <pre><code>def test_terraform_anyscale_v2_e2e_public_gcp(setup_anyscale_test_env):
+    # ... setup, tf.init(), tf.apply() ...
+
+    try:
+        # Register cloud
+        cloud_controller.register_gcp_cloud(...)
+
+        # Wait for admin zone
+        CloudFunctionalVerificationController(
+            cloud_controller.cloud_event_producer, cloud_controller.log
+        )._prepare_verification(cloud_id, "GCP")
+
+        # Delete cloud
+        cloud_controller.delete_cloud(
+            cloud_name=cloud_name, cloud_id="", skip_confirmation=True,
+        )
+    finally:
+        # ALWAYS destroy terraform resources, even if test fails
+        print("Destroying anyscale_v2_e2e_public gcp terraform (cleanup)...")
+        return_code, stdout, stderr = tf.destroy(
+            force=IsNotFlagged, auto_approve=IsFlagged
+        )
+        if return_code != 0:
+            print(f"WARNING: Failed to destroy terraform: {stderr}")</code></pre>
+  <p>Same pattern applied for <code>test_terraform_anyscale_v2_e2e_public_aws</code>.</p>
+
+  <div class="callout-warn callout">
+    <strong>Limitation:</strong> <code>try/finally</code> won't help when the 30-min Buildkite
+    timeout sends SIGKILL &mdash; for that you need fix #3.
+  </div>
+
+  <h3>2. Delete the 393 orphaned projects <span class="tag tag-cleanup">Cleanup</span> <span class="tag tag-done">Done</span></h3>
+  <p>
+    Sumeet ran a manual cleanup script (<code>cleanup_stale_gcp_terraform_projects.py</code>)
+    using the GCP service account from the <code>gce-cloud-terraform-e2e-test</code> secret.
+    Dry run was executed first, then 393 projects were deleted.
+  </p>
+  <pre><code># List all anyscale-tftst projects under the test folder
+gcloud projects list \
+  --filter="name:anyscale-tftst AND parent.id=953296303039" \
+  --format="value(projectId)"
+
+# After review, delete each:
+gcloud projects delete &lt;project-id&gt;</code></pre>
+
+  <h3>3. Periodic GCP cleanup cron <span class="tag tag-prevention">Prevention</span></h3>
+  <p>
+    Add a cleanup job (alongside the existing K8s cleanup in
+    <code>tools/kubernetes/ci/cleanup.yaml</code>) that deletes <code>anyscale-tftst-*</code>
+    GCP projects older than 2 hours under folder <code>953296303039</code>.
+  </p>
+  <div class="callout">
+    This is the only fix that handles the <strong>SIGKILL case</strong> from Buildkite timeouts.
+    Sumeet will re-check on May 5, 2026 to see if projects are still accumulating. If so, the
+    reaper job will be created.
+  </div>
+
+  <!-- ======== TIMELINE ======== -->
+  <h2 id="timeline">Timeline</h2>
+  <div class="timeline">
+    <div class="timeline-entry">
+      <div class="timeline-date">2023-07-10</div>
+      <div class="timeline-text"><span class="timeline-author">Yue Zhang</span> adds GCP Terraform E2E test (commit <code>9cdc2ccd</code>). Leak begins.</div>
+    </div>
+    <div class="timeline-entry">
+      <div class="timeline-date">2025-10-03</div>
+      <div class="timeline-text"><span class="timeline-author">Janet Li</span> updates cloud registration API calls (<a href="https://github.com/anyscale/product/pull/35744">PR #35744</a>). No cleanup fix added.</div>
+    </div>
+    <div class="timeline-entry">
+      <div class="timeline-date">2026-03-25</div>
+      <div class="timeline-text"><span class="timeline-author">Dale Wang</span> flags 100+ orphaned projects in <a href="https://anyscaleteam.slack.com/archives/C03H71KUPJN/p1774412474485259">#cloud-cost-audit</a>. <span class="timeline-author">Harshil Vyas</span> identifies root cause as missing cleanup in Terraform E2E test.</div>
+    </div>
+    <div class="timeline-entry">
+      <div class="timeline-date">2026-03-26</div>
+      <div class="timeline-text"><span class="timeline-author">Arun Singhal</span> acknowledges; delayed by AMI incident ops.</div>
+    </div>
+    <div class="timeline-entry">
+      <div class="timeline-date">2026-04-01</div>
+      <div class="timeline-text"><span class="timeline-author">Arun Singhal</span> creates <a href="https://anyscale1.atlassian.net/browse/CI-1926">CI-1926</a> (P1).</div>
+    </div>
+    <div class="timeline-entry">
+      <div class="timeline-date">2026-04-02</div>
+      <div class="timeline-text"><span class="timeline-author">Sumeet Khirwal</span> ships <a href="https://github.com/anyscale/product/pull/38915">PR #38915</a> with try/finally fix + cleanup script. Deletes 393 orphaned projects. CI-1926 closed.</div>
+    </div>
+    <div class="timeline-entry">
+      <div class="timeline-date">2026-05-05 (planned)</div>
+      <div class="timeline-text">Re-check for accumulating projects. Create reaper cron if needed.</div>
+    </div>
+  </div>
+
+  <!-- ======== REFERENCES ======== -->
+  <h2 id="references">References</h2>
+
+  <h3>Code</h3>
+  <table>
+    <tr><th>File</th><th>Description</th></tr>
+    <tr><td><code>backend/tests/bk_e2e/test_cloud_terraform.py</code></td><td>The test with missing cleanup (now fixed)</td></tr>
+    <tr><td><code>.buildkite/pipeline.predeploy.yaml:335</code></td><td>30-min timeout config</td></tr>
+    <tr><td><code>tools/kubernetes/ci/cleanup.py</code></td><td>Existing CI cleanup (K8s only, no GCP)</td></tr>
+  </table>
+
+  <h3>GitHub</h3>
+  <table>
+    <tr><th>Link</th><th>Description</th></tr>
+    <tr><td><a href="https://github.com/anyscale/product/pull/38915">PR #38915</a></td><td>Fix: try/finally + cleanup script (Sumeet Khirwal)</td></tr>
+    <tr><td><a href="https://github.com/anyscale/product/pull/35744">PR #35744</a></td><td>Last change to test file (Janet Li, 2025-10-03) &mdash; API call modernization, no cleanup fix</td></tr>
+    <tr><td><code>9cdc2ccd</code></td><td>Original GCP test added (Yue Zhang, 2023-07-10)</td></tr>
+  </table>
+
+  <h3>Tracking</h3>
+  <table>
+    <tr><th>Link</th><th>Description</th></tr>
+    <tr><td><a href="https://anyscale1.atlassian.net/browse/CI-1926">CI-1926</a></td><td>Jira ticket (P1, Closed)</td></tr>
+    <tr><td><a href="https://anyscaleteam.slack.com/archives/C03H71KUPJN/p1774412474485259">#cloud-cost-audit</a></td><td>Original Slack thread</td></tr>
+  </table>
+
+  <div class="footer">
+    Generated by Claude Code &mdash; 2026-04-02
+  </div>
+
+</div>
+</body>
+</html>

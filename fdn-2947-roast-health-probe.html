@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>FDN-2947: Roast Server Health Probe Timeout</title>
+<style>
+  :root {
+    --bg: #1a1a2e;
+    --surface: #16213e;
+    --surface2: #0f3460;
+    --accent: #e94560;
+    --accent2: #533483;
+    --text: #eee;
+    --text-muted: #aab;
+    --green: #4ecca3;
+    --yellow: #f0c929;
+    --orange: #ff6b35;
+    --code-bg: #0d1117;
+    --border: #2a2a4a;
+  }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    background: var(--bg);
+    color: var(--text);
+    line-height: 1.7;
+  }
+  .hero {
+    background: linear-gradient(135deg, var(--surface) 0%, var(--accent2) 100%);
+    padding: 3rem 2rem;
+    border-bottom: 3px solid var(--accent);
+  }
+  .hero h1 { font-size: 2rem; font-weight: 700; margin-bottom: 0.5rem; }
+  .hero .subtitle { color: var(--text-muted); font-size: 1rem; }
+  .hero .meta {
+    margin-top: 1rem;
+    display: flex; gap: 1.5rem; flex-wrap: wrap; font-size: 0.85rem;
+  }
+  .hero .meta span {
+    background: rgba(255,255,255,0.08);
+    padding: 0.3rem 0.8rem; border-radius: 6px;
+  }
+  .hero .meta a { color: var(--green); text-decoration: none; }
+  .hero .meta a:hover { text-decoration: underline; }
+  .banner {
+    border-left: 4px solid var(--orange);
+    background: linear-gradient(90deg, rgba(255,107,53,0.15), rgba(255,107,53,0.05));
+    padding: 1rem 1.5rem;
+    margin: 2rem auto; max-width: 900px;
+    border-radius: 0 8px 8px 0;
+    font-size: 1.1rem; font-weight: 600;
+  }
+  .container { max-width: 900px; margin: 0 auto; padding: 0 2rem 4rem; }
+  .toc {
+    background: var(--surface); border: 1px solid var(--border);
+    border-radius: 8px; padding: 1.5rem; margin: 2rem 0;
+  }
+  .toc h3 {
+    font-size: 0.85rem; text-transform: uppercase;
+    letter-spacing: 0.1em; color: var(--text-muted); margin-bottom: 0.75rem;
+  }
+  .toc ul { list-style: none; }
+  .toc li { margin: 0.4rem 0; }
+  .toc a { color: var(--green); text-decoration: none; font-size: 0.95rem; }
+  .toc a:hover { text-decoration: underline; }
+  h2 {
+    font-size: 1.5rem; margin: 2.5rem 0 1rem;
+    padding-bottom: 0.5rem; border-bottom: 1px solid var(--border);
+  }
+  h3 { font-size: 1.15rem; margin: 1.5rem 0 0.75rem; color: var(--green); }
+  p { margin: 0.75rem 0; }
+  code {
+    background: var(--code-bg); padding: 0.15rem 0.4rem; border-radius: 4px;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: 0.88em; color: var(--yellow);
+  }
+  pre {
+    background: var(--code-bg); border: 1px solid var(--border);
+    border-radius: 8px; padding: 1.25rem; overflow-x: auto; margin: 1rem 0;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: 0.85rem; line-height: 1.6;
+  }
+  pre code { background: none; padding: 0; color: var(--text); }
+  .tag {
+    display: inline-block; padding: 0.2rem 0.6rem; border-radius: 4px;
+    font-size: 0.75rem; font-weight: 700; text-transform: uppercase;
+    letter-spacing: 0.05em; margin-left: 0.5rem; vertical-align: middle;
+  }
+  .tag-critical { background: var(--accent); color: #fff; }
+  .tag-short { background: var(--orange); color: #fff; }
+  .tag-medium { background: var(--yellow); color: #1a1a2e; }
+  .tag-observability { background: var(--accent2); color: #fff; }
+  .callout {
+    background: rgba(78,204,163,0.08); border-left: 4px solid var(--green);
+    padding: 1rem 1.5rem; border-radius: 0 8px 8px 0; margin: 1rem 0;
+  }
+  .callout-warn {
+    background: rgba(240,201,41,0.08); border-left-color: var(--yellow);
+  }
+  .callout-danger {
+    background: rgba(233,69,96,0.08); border-left-color: var(--accent);
+  }
+  ul, ol { margin: 0.75rem 0 0.75rem 1.5rem; }
+  li { margin: 0.4rem 0; }
+  a { color: var(--green); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+  table {
+    width: 100%; border-collapse: collapse; margin: 1rem 0; font-size: 0.9rem;
+  }
+  th {
+    background: var(--surface2); text-align: left; padding: 0.75rem 1rem;
+    font-weight: 600; border-bottom: 2px solid var(--border);
+  }
+  td { padding: 0.6rem 1rem; border-bottom: 1px solid var(--border); }
+  tr:hover td { background: rgba(255,255,255,0.02); }
+  .timeline {
+    border-left: 2px solid var(--accent2);
+    margin: 1.5rem 0 1.5rem 1rem; padding-left: 1.5rem;
+  }
+  .timeline-entry { position: relative; margin-bottom: 1.25rem; }
+  .timeline-entry::before {
+    content: ''; position: absolute; left: -1.85rem; top: 0.5rem;
+    width: 10px; height: 10px; border-radius: 50%;
+    background: var(--accent2); border: 2px solid var(--bg);
+  }
+  .timeline-date { font-size: 0.8rem; color: var(--text-muted); font-family: monospace; }
+  .timeline-text { font-size: 0.95rem; }
+  .timeline-author { color: var(--yellow); font-weight: 600; }
+  .diagram {
+    background: var(--code-bg); border: 1px solid var(--border);
+    border-radius: 8px; padding: 1.5rem; margin: 1.5rem 0;
+    font-family: 'JetBrains Mono', 'Fira Code', monospace;
+    font-size: 0.82rem; line-height: 1.8; overflow-x: auto;
+    white-space: pre;
+  }
+  .footer {
+    margin-top: 3rem; padding-top: 1.5rem;
+    border-top: 1px solid var(--border);
+    font-size: 0.8rem; color: var(--text-muted); text-align: center;
+  }
+</style>
+</head>
+<body>
+
+<div class="hero">
+  <h1>Roast Server Health Probe Timeout</h1>
+  <p class="subtitle">FDN-2947 Investigation &mdash; Liveness probe failures killing the reverse proxy pod</p>
+  <div class="meta">
+    <span>Jira: <a href="https://anyscale1.atlassian.net/browse/FDN-2947">FDN-2947</a> (P2, Submitted)</span>
+    <span>Slack: <a href="https://anyscaleteam.slack.com/archives/C04N3TZV318/p1772376123269489">#gcplane-oncall thread</a></span>
+    <span>Assignee: Pei Yang</span>
+    <span>Component: Infra &amp; Internals</span>
+  </div>
+</div>
+
+<div class="banner">
+  Liveness probe timeout on <code>/healthz</code> &rarr; K8s kills <code>roast-server-reverse-proxy</code> pod &rarr; Loki push interruption in production
+</div>
+
+<div class="container">
+
+  <nav class="toc">
+    <h3>On This Page</h3>
+    <ul>
+      <li><a href="#problem">The Problem</a></li>
+      <li><a href="#investigation">Investigation Trail</a></li>
+      <li><a href="#root-cause">Root Cause</a></li>
+      <li><a href="#fix">Proposed Fix</a></li>
+      <li><a href="#timeline">Timeline</a></li>
+      <li><a href="#references">References</a></li>
+    </ul>
+  </nav>
+
+  <!-- ======== PROBLEM ======== -->
+  <h2 id="problem">The Problem</h2>
+  <p>
+    On March 1, 2026, the <code>roast-server-reverse-proxy</code> pod in the <code>roast</code>
+    namespace (production cluster) was killed and restarted by Kubernetes. Only one replica was
+    affected. The pod had been running continuously since February 7 (~22 days).
+  </p>
+  <p>
+    The pod exited cleanly (exit code 0) after receiving a SIGTERM, but the restart interrupted
+    Loki log ingestion via <code>/loki/api/v1/push</code> forwarding.
+  </p>
+
+  <div class="callout-danger callout">
+    This is a recurring issue &mdash; it has happened before with no prior RCA. The same failure
+    pattern could affect any long-running roast proxy replica.
+  </div>
+
+  <!-- ======== INVESTIGATION ======== -->
+  <h2 id="investigation">Investigation Trail</h2>
+
+  <h3>Initial hypothesis: connection/goroutine accumulation</h3>
+  <p>
+    Pei's initial theory was that too many open connections or accumulated goroutines were blocking
+    the <code>/healthz</code> endpoint. No CPU, memory, or disk pressure was observed on the node.
+  </p>
+
+  <h3>Logs from the restarted pod</h3>
+  <p>The proxy logged a clean shutdown sequence triggered by an external signal:</p>
+  <pre><code>{"level":"info", "caller":"reverse_proxy.go:181",
+ "msg":"Forwarding request /loki/api/v1/push"}
+{"level":"info", "caller":"reverse_proxy.go:88",
+ "msg":"Received shutdown signal, stopping proxy server..."}
+{"level":"info", "caller":"reverse_proxy.go:103",
+ "msg":"Shutting down proxy server..."}
+{"level":"error","caller":"reverse_proxy.go:77",
+ "msg":"Error starting proxy server: accept tcp [::]:8446: use of closed network connection"}
+{"level":"info", "caller":"reverse_proxy.go:118",
+ "msg":"Proxy server stopped successfully"}</code></pre>
+  <p>
+    The shutdown was triggered via <code>signal.NotifyContext</code> (listening for
+    <code>os.Interrupt</code> and <code>syscall.SIGTERM</code>). It was <strong>not</strong> a
+    suture self-termination.
+  </p>
+
+  <h3>Dead end: K8s events not found by pod name</h3>
+  <p>
+    Pei searched CloudWatch audit logs filtered by pod name and found <strong>no events</strong>
+    before the restart. This initially made the cause mysterious &mdash; it appeared the pod just
+    received a SIGTERM from nowhere.
+  </p>
+  <pre><code>aws logs filter-log-events \
+    --log-group-name "/aws/eks/production_cluster/cluster" \
+    --start-time 1772373573000 \
+    --end-time 1772375400000 \
+    --filter-pattern '{ $.objectRef.name = "roast-server-reverse-proxy-7d67b94fd7-xdhpr" }' \
+    --max-items 50</code></pre>
+  <p>Result: no events. The filter was too narrow &mdash; K8s events use <code>objectRef.resource = "events"</code> at the namespace level, not the pod name in <code>objectRef.name</code>.</p>
+
+  <h3>Breakthrough: Siv finds the liveness probe failures</h3>
+  <p>
+    Chris Sivanich queried the audit logs by <strong>namespace + resource type</strong> instead of
+    pod name, revealing 6 consecutive liveness probe failures:
+  </p>
+  <pre><code>aws logs filter-log-events \
+    --log-group-name "/aws/eks/production_cluster/cluster" \
+    --start-time $((1772375373000 - 300 * 1000)) \
+    --end-time $((1772375373000 + 300 * 1000)) \
+    --filter-pattern '{ $.objectRef.resource = "events" && $.objectRef.namespace = "roast" }' \
+    --max-items 100 | jq -r '.events[].message' | jq -s '.[].requestObject' | grep -B2 -i probe</code></pre>
+
+  <p>Output (abbreviated):</p>
+  <pre><code>"count": 4, "lastTimestamp": "2026-03-01T14:29:13Z",
+"message": "Liveness probe failed: Get \"http://10.0.13.174:8445/healthz\":
+  context deadline exceeded (Client.Timeout exceeded while awaiting headers)"
+
+"count": 5, "lastTimestamp": "2026-03-01T14:29:23Z",
+"message": "Liveness probe failed: ..."
+
+"count": 6, "lastTimestamp": "2026-03-01T14:29:33Z",
+"message": "Liveness probe failed: ..."
+
+"reason": "Killing",
+"message": "Container roast-server-reverse-proxy failed liveness probe, will be restarted"</code></pre>
+
+  <!-- ======== ROOT CAUSE ======== -->
+  <h2 id="root-cause">Root Cause</h2>
+
+  <p>
+    The Kubernetes <strong>liveness probe</strong> on <code>http://10.0.13.174:8445/healthz</code>
+    timed out 6 consecutive times over ~30 seconds, triggering K8s to kill the container. The
+    SIGTERM from K8s was then handled by the Go process via <code>signal.NotifyContext</code>,
+    producing the clean shutdown logs.
+  </p>
+
+  <h3>Why did <code>/healthz</code> stop responding?</h3>
+
+  <div class="diagram">  ┌──────────────────────────────────────────────────────┐
+  │           roast-server-reverse-proxy (Go)              │
+  │                                                        │
+  │  :8446  ─── request handler ──► /loki/api/v1/push      │
+  │              (forwarding goroutines)                    │
+  │                                                        │
+  │  :8445  ─── /healthz endpoint                          │
+  │              (shares same goroutine pool / event loop)  │
+  │                                                        │
+  └──────────────────────────────────────────────────────┘
+                         │
+           If request goroutines accumulate
+           or block on upstream Loki...
+                         │
+                         ▼
+           /healthz can't respond within
+           liveness probe timeout
+                         │
+                         ▼
+           K8s kills pod after 6 failures</div>
+
+  <p>The most likely cause is <strong>goroutine or connection saturation</strong> in the reverse proxy:</p>
+  <ul>
+    <li>The proxy forwards high-volume <code>/loki/api/v1/push</code> requests to the upstream Loki ingester</li>
+    <li>If the upstream Loki becomes slow (backpressure, GC pause, disk I/O), forwarding goroutines accumulate waiting for responses</li>
+    <li>The <code>/healthz</code> handler shares the same HTTP server or goroutine pool, so it gets starved</li>
+    <li>After ~22 days of uptime, connection state may have accumulated (leaked goroutines, unclosed connections, or exhausted file descriptors)</li>
+  </ul>
+
+  <div class="callout-warn callout">
+    <strong>Observability gap:</strong> K8s events for the GCPlane <code>roast</code> namespace
+    are not exported to Loki. Debugging required manual CloudWatch audit log queries, which cost
+    significant investigation time and required non-obvious filter patterns.
+  </div>
+
+  <!-- ======== FIX ======== -->
+  <h2 id="fix">Proposed Fix</h2>
+
+  <h3>1. Separate health check listener <span class="tag tag-critical">Critical</span></h3>
+  <p>
+    Move <code>/healthz</code> to a <strong>dedicated HTTP server</strong> on its own goroutine,
+    independent of the request-forwarding server. This ensures the health endpoint remains
+    responsive even under heavy proxy load.
+  </p>
+  <pre><code>// Current: single server handles both health and proxy traffic
+// reverse_proxy.go
+
+// Proposed: separate health server on :8445, proxy on :8446
+func main() {
+    ctx, cancel := signal.NotifyContext(context.Background(),
+        os.Interrupt, syscall.SIGTERM)
+    defer cancel()
+
+    // Health server — lightweight, isolated from proxy load
+    healthMux := http.NewServeMux()
+    healthMux.HandleFunc("/healthz", func(w http.ResponseWriter, r *http.Request) {
+        w.WriteHeader(http.StatusOK)
+        w.Write([]byte("ok"))
+    })
+    healthServer := &http.Server{Addr: ":8445", Handler: healthMux}
+    go healthServer.ListenAndServe()
+
+    // Proxy server — handles /loki/api/v1/push forwarding
+    proxyServer := &http.Server{
+        Addr:         ":8446",
+        Handler:      proxyHandler,
+        ReadTimeout:  30 * time.Second,
+        WriteTimeout: 60 * time.Second,
+        IdleTimeout:  120 * time.Second,
+    }
+    go proxyServer.ListenAndServe()
+
+    &lt;-ctx.Done()
+    // Graceful shutdown of both servers...
+}</code></pre>
+
+  <h3>2. Add connection/goroutine limits to the proxy <span class="tag tag-short">Short-term</span></h3>
+  <p>
+    Prevent unbounded goroutine accumulation when the upstream is slow:
+  </p>
+  <ul>
+    <li>Set <code>MaxIdleConnsPerHost</code> on the reverse proxy's <code>http.Transport</code></li>
+    <li>Add <code>ReadTimeout</code>, <code>WriteTimeout</code>, and <code>IdleTimeout</code> to the proxy server</li>
+    <li>Consider a semaphore or <code>golang.org/x/sync/semaphore</code> to cap concurrent forwarding goroutines</li>
+  </ul>
+  <pre><code>transport := &http.Transport{
+    MaxIdleConns:        100,
+    MaxIdleConnsPerHost: 50,
+    IdleConnTimeout:     90 * time.Second,
+    ResponseHeaderTimeout: 30 * time.Second,
+}</code></pre>
+
+  <h3>3. Tune liveness probe thresholds <span class="tag tag-medium">Medium-term</span></h3>
+  <p>
+    The current probe appears to have tight timeouts. Consider adjusting:
+  </p>
+  <pre><code>livenessProbe:
+  httpGet:
+    path: /healthz
+    port: 8445
+  initialDelaySeconds: 15
+  periodSeconds: 10
+  timeoutSeconds: 5        # increase from default 1s
+  failureThreshold: 6      # keep at 6 (current)
+  successThreshold: 1</code></pre>
+  <div class="callout-warn callout">
+    <strong>Note:</strong> Tuning the probe is a mitigation, not a fix. If <code>/healthz</code>
+    is on a separate listener (fix #1), the probe timeout becomes less critical.
+  </div>
+
+  <h3>4. Export K8s events to Loki for GCPlane <span class="tag tag-observability">Observability</span></h3>
+  <p>
+    K8s events for the <code>roast</code> namespace are not in Loki, forcing manual CloudWatch
+    queries. Adding event export would:
+  </p>
+  <ul>
+    <li>Make liveness/readiness probe failures immediately visible in Grafana</li>
+    <li>Enable alerting on repeated probe failures before pod kill</li>
+    <li>Reduce investigation time from hours to minutes</li>
+  </ul>
+  <p>
+    Siv noted this gap: <em>"want to get these into Loki to make them much easier than this"</em>
+  </p>
+
+  <!-- ======== TIMELINE ======== -->
+  <h2 id="timeline">Timeline</h2>
+  <div class="timeline">
+    <div class="timeline-entry">
+      <div class="timeline-date">2026-02-07 11:19 UTC</div>
+      <div class="timeline-text">Pod <code>roast-server-reverse-proxy-7d67b94fd7-xdhpr</code> starts running.</div>
+    </div>
+    <div class="timeline-entry">
+      <div class="timeline-date">2026-03-01 14:29:03 UTC</div>
+      <div class="timeline-text">First liveness probe failure: <code>/healthz</code> times out with <code>context deadline exceeded</code>.</div>
+    </div>
+    <div class="timeline-entry">
+      <div class="timeline-date">2026-03-01 14:29:33 UTC</div>
+      <div class="timeline-text">6th consecutive liveness probe failure. K8s sends SIGTERM &mdash; <em>"Container roast-server-reverse-proxy failed liveness probe, will be restarted."</em></div>
+    </div>
+    <div class="timeline-entry">
+      <div class="timeline-date">2026-03-01 14:29:37 UTC</div>
+      <div class="timeline-text">Pod restarts successfully. New instance begins forwarding requests.</div>
+    </div>
+    <div class="timeline-entry">
+      <div class="timeline-date">2026-03-01 (alert fired)</div>
+      <div class="timeline-text"><span class="timeline-author">Pratik Padalia</span> reports the restart in Slack. Notes clean exit code 0, no errors in logs. Asks Pei for prior RCA.</div>
+    </div>
+    <div class="timeline-entry">
+      <div class="timeline-date">2026-03-01 — 03-03</div>
+      <div class="timeline-text"><span class="timeline-author">Pei Yang</span> investigates: reviews logs, checks node metrics (no pressure), queries CloudWatch audit logs by pod name (no results). Dead end.</div>
+    </div>
+    <div class="timeline-entry">
+      <div class="timeline-date">2026-03-03</div>
+      <div class="timeline-text"><span class="timeline-author">Chris Sivanich (Siv)</span> queries audit logs by namespace + resource type instead of pod name. Finds the 6 liveness probe failures. Root cause confirmed.</div>
+    </div>
+    <div class="timeline-entry">
+      <div class="timeline-date">2026-03-03</div>
+      <div class="timeline-text"><span class="timeline-author">Pei Yang</span> creates <a href="https://anyscale1.atlassian.net/browse/FDN-2947">FDN-2947</a> to track further investigation and fix.</div>
+    </div>
+  </div>
+
+  <!-- ======== REFERENCES ======== -->
+  <h2 id="references">References</h2>
+
+  <h3>Code</h3>
+  <table>
+    <tr><th>File</th><th>Description</th></tr>
+    <tr><td><code>reverse-proxy/reverse_proxy.go</code></td><td>Roast reverse proxy &mdash; request forwarding, health endpoint, signal handling</td></tr>
+    <tr><td><code>reverse_proxy.go:181</code></td><td>Request forwarding log line</td></tr>
+    <tr><td><code>reverse_proxy.go:88</code></td><td>Shutdown signal handler</td></tr>
+    <tr><td><code>reverse_proxy.go:77</code></td><td>Closed connection error on shutdown</td></tr>
+  </table>
+
+  <h3>Infrastructure</h3>
+  <table>
+    <tr><th>Resource</th><th>Description</th></tr>
+    <tr><td>Namespace: <code>roast</code></td><td>GCPlane roast server deployment (production cluster)</td></tr>
+    <tr><td>Pod: <code>roast-server-reverse-proxy-7d67b94fd7-xdhpr</code></td><td>Affected pod instance</td></tr>
+    <tr><td>Node: <code>ip-10-0-13-221.us-west-2.compute.internal</code></td><td>Host node (no resource pressure observed)</td></tr>
+    <tr><td>Health endpoint: <code>:8445/healthz</code></td><td>Liveness probe target</td></tr>
+    <tr><td>Proxy endpoint: <code>:8446</code></td><td>Request forwarding port</td></tr>
+  </table>
+
+  <h3>Tracking</h3>
+  <table>
+    <tr><th>Link</th><th>Description</th></tr>
+    <tr><td><a href="https://anyscale1.atlassian.net/browse/FDN-2947">FDN-2947</a></td><td>Jira ticket (P2, Submitted, assigned to Pei Yang)</td></tr>
+    <tr><td><a href="https://anyscale1.atlassian.net/browse/FDN-12">FDN-12</a></td><td>Parent epic: Dataplane issues</td></tr>
+    <tr><td><a href="https://anyscaleteam.slack.com/archives/C04N3TZV318/p1772376123269489">#gcplane-oncall</a></td><td>Original Slack thread (22 replies)</td></tr>
+  </table>
+
+  <div class="footer">
+    Generated by Claude Code &mdash; 2026-04-02
+  </div>
+
+</div>
+</body>
+</html>
